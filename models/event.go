@@ -11,12 +11,12 @@ type Event struct {
 	Description string    `binding:"required"` // pesquisar como formatar a nomenclatura JSON
 	Location    string    `binding:"required"`
 	DateTime    time.Time `binding:"required"`
-	UserId      int
+	UserId      int64
 }
 
 var events = []Event{}
 
-func (e Event) Save() error{
+func (e *Event) Save() error {
 	query := `INSERT INTO events(name, description, location, dateTime, user_id)
 	VALUES (?, ?, ?, ?, ?)`
 	statement, err := database.DB.Prepare(query)
@@ -36,7 +36,7 @@ func (e Event) Save() error{
 func GetAllEvents() ([]Event, error) {
 	query := "SELECT * FROM events"
 	rows, err := database.DB.Query(query)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
@@ -57,15 +57,77 @@ func GetAllEvents() ([]Event, error) {
 	return events, nil
 }
 
-func GetEventByID(id int64) (*Event, error){
+func GetEventByID(id int64) (*Event, error) {
 	query := "SELECT * FROM events WHERE id = ?"
 	row := database.DB.QueryRow(query, id)
 
-	var event Event 
+	var event Event
 	err := row.Scan(&event.ID, &event.Name, &event.Description, &event.Location, &event.DateTime, &event.UserId)
 
 	if err != nil {
 		return nil, err
 	}
-	return &event, nil 
+	return &event, nil
+}
+
+func (event Event) Update() error {
+	query := `
+	UPDATE events
+	SET name = ?, description = ?, location = ?, dateTime = ?
+	WHERE id = ?`
+
+	stmt, err := database.DB.Prepare(query)
+
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(&event.Name, &event.Description, &event.Location, &event.DateTime, &event.ID)
+
+	return err
+}
+
+func (event Event) Delete() error {
+	query := "DELETE FROM events WHERE id = ?"
+	stmt, err := database.DB.Prepare(query)
+
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(event.ID)
+	return err
+}
+
+func (e Event) Register(userID int64) error{
+	query := "INSERT INTO registrations(event_id, user_id) VALUES (?, ?)"
+	stmt, err := database.DB.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(e.ID, userID)
+
+	return err
+}
+
+func (e Event) CalcelRegistration(userId int64) error{
+	query := "DELETE FROM registrations WHERE event_id = ? AND user_id = ?"
+	stmt, err := database.DB.Prepare(query)
+
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	_, err = stmt.Exec(e.ID, userId)
+
+	return err
 }
